@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PDF Corner Image Inserter</title>
+<style>
+:root{--bg:#eef3fb;--panel:#fff;--ink:#18233b;--muted:#64748b;--blue:#2457d6;--line:#dbe4f0;--good:#087f5b;--shadow:0 12px 34px rgba(28,47,87,.12)}
+*{box-sizing:border-box}
+body{margin:0;background:linear-gradient(145deg,#eaf1ff,#f7f9fc 55%,#e9f7f5);font:15px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;color:var(--ink)}
+.wrap{max-width:1050px;margin:auto;padding:20px}
+header{background:linear-gradient(120deg,#142b64,#2457d6 60%,#128a91);color:#fff;border-radius:20px;padding:24px;box-shadow:var(--shadow)}
+header h1{margin:0 0 5px;font-size:clamp(22px,4vw,32px);letter-spacing:.2px}
+header p{margin:0;color:#e5edff}
+.layout{display:grid;grid-template-columns:minmax(280px,390px) minmax(0,1fr);gap:14px;margin-top:14px;align-items:start}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:13px;box-shadow:var(--shadow);min-width:0}
+h2{font-size:16px;margin:0 0 8px}
+.field{margin:0 0 9px}
+label{display:block;font-weight:700;margin-bottom:4px;font-size:13px}
+input[type=file],input[type=number],select{width:100%;padding:7px 8px;border:1px solid #cbd5e1;border-radius:8px;background:#fff;color:var(--ink);font:inherit;font-size:13px}
+input[type=range]{width:100%;accent-color:var(--blue);margin:3px 0;display:block}
+small,.hint{color:var(--muted);font-size:11px}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.image-box{padding:8px;border:1px dashed #9bb0d1;border-radius:10px;background:#f8faff;margin-bottom:8px}
+.image-box label{font-size:13px}
+.image-box .field{margin-bottom:5px}
+button{border:0;border-radius:10px;padding:9px 12px;font:700 13px system-ui;cursor:pointer;transition:transform .15s,filter .15s}
+button:hover{filter:brightness(1.04);transform:translateY(-1px)}
+button:disabled{opacity:.45;cursor:not-allowed;transform:none}
+.primary{background:linear-gradient(120deg,#2457d6,#4f46e5);color:#fff;width:100%;box-shadow:0 6px 16px #2457d633}
+.secondary{background:#e9efff;color:#2047a6}
+.actions{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:12px}
+.preview-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px}
+.pill{font-size:11px;font-weight:800;border-radius:99px;padding:4px 8px;background:#e7f8f1;color:var(--good)}
+.canvas-wrap{background:#dfe6f0;border-radius:11px;padding:8px;min-height:260px;display:flex;align-items:center;justify-content:center;overflow:auto}
+@media(min-width:761px){.layout{grid-template-columns:minmax(300px,370px) minmax(0,1fr)}.layout>.panel:first-child{position:sticky;top:10px;max-height:calc(100vh - 20px);overflow-y:auto}.layout>.panel:last-child{position:sticky;top:10px}}
+#previewCanvas{max-width:100%;height:auto;background:white;box-shadow:0 4px 18px #24334b2b}
+.placeholder{text-align:center;color:var(--muted);padding:40px 12px}
+.placeholder .symbol{font-size:42px;margin-bottom:8px}
+.status{margin-top:12px;padding:10px 12px;border-radius:10px;background:#f1f5f9;color:#475569;font-size:13px;overflow-wrap:anywhere}
+.status.error{background:#fff0f0;color:#b42318}
+.status.success{background:#eafaf2;color:#087f5b}
+.note{margin-top:9px;padding:9px;border-left:3px solid #f0b429;background:#fff9e8;border-radius:8px;font-size:11px;color:#6b5415}
+footer{text-align:center;color:var(--muted);font-size:12px;padding:18px}
+@media(max-width:760px){.wrap{padding:12px}.layout{grid-template-columns:1fr;gap:12px}header{padding:19px;border-radius:15px}.panel{padding:15px}.canvas-wrap{min-height:220px}.actions{grid-template-columns:1fr 1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <h1>📄 PDF Corner Image Inserter</h1>
+  <p>Add corner images to a PDF while preserving the original pages and text wherever possible.</p>
+</header>
+<div class="layout">
+<section class="panel">
+  <h2>1 · Choose your files</h2>
+  <div class="field">
+    <label for="pdfFile">Original PDF <span style="color:#c02626">*</span></label>
+    <input id="pdfFile" type="file" accept="application/pdf,.pdf">
+    <small>The source file is not modified.</small>
+  </div>
+  <div class="image-box">
+    <label for="topImage">2 · Top-left image (optional)</label>
+    <input id="topImage" type="file" accept="image/png,image/jpeg,image/webp">
+    <small>PNG, JPEG or WebP. Transparent PNG logos are supported.</small>
+  </div>
+  <div class="image-box">
+    <label for="bottomImage">3 · Bottom-right image (optional)</label>
+    <input id="bottomImage" type="file" accept="image/png,image/jpeg,image/webp">
+    <small>Choose a signature, stamp or other image.</small>
+  </div>
+  <h2 style="margin-top:10px">4 · Placement settings</h2>
+  <div class="field">
+    <label for="pages">Apply images to</label>
+    <select id="pages">
+      <option value="all">Every page</option>
+      <option value="first">First page only</option>
+      <option value="last">Last page only</option>
+    </select>
+  </div>
+  <div class="row">
+    <div class="field">
+      <label for="margin">Safe margin (pt)</label>
+      <input id="margin" type="number" min="0" max="144" value="24" step="2">
+      <small>72 pt = 1 inch</small>
+    </div>
+    <div class="field">
+      <label for="maxWidth">Max width (pt)</label>
+      <input id="maxWidth" type="number" min="12" max="360" value="90" step="5">
+      <small>Image stays proportional</small>
+    </div>
+  </div>
+  <div class="field">
+    <label for="maxHeight">Maximum height: <span id="heightLabel">60 pt</span></label>
+    <input id="maxHeight" type="range" min="20" max="180" step="5" value="60">
+  </div>
+  <div class="image-box">
+    <label>Top-left image position</label>
+    <div class="field">
+      <label for="topShiftX">Horizontal shift: <span id="topShiftXLabel">0 pt</span></label>
+      <input id="topShiftX" type="range" min="-200" max="200" step="2" value="0">
+    </div>
+    <div class="field" style="margin-bottom:0">
+      <label for="topShiftY">Vertical shift: <span id="topShiftYLabel">0 pt</span></label>
+      <input id="topShiftY" type="range" min="-200" max="200" step="2" value="0">
+    </div>
+    <small>Positive horizontal moves right; positive vertical moves down.</small>
+  </div>
+  <div class="image-box">
+    <label>Bottom-right image position</label>
+    <div class="field">
+      <label for="bottomShiftX">Horizontal shift: <span id="bottomShiftXLabel">0 pt</span></label>
+      <input id="bottomShiftX" type="range" min="-200" max="200" step="2" value="0">
+    </div>
+    <div class="field" style="margin-bottom:0">
+      <label for="bottomShiftY">Vertical shift: <span id="bottomShiftYLabel">0 pt</span></label>
+      <input id="bottomShiftY" type="range" min="-200" max="200" step="2" value="0">
+    </div>
+    <small>Positive horizontal moves right; positive vertical moves down.</small>
+  </div>
+  <button class="primary" id="makePdf" disabled>Generate new PDF</button>
+  <div class="actions">
+    <button class="secondary" id="refreshPreview" disabled>Refresh preview</button>
+    <button class="secondary" id="downloadPdf" disabled>Download PDF</button>
+  </div>
+  <div id="status" class="status">Choose a PDF to begin. You can add either image or both.</div>
+  <div class="note"><b>Overlap note:</b> images are kept inside the selected page margins and scaled without distortion. The app cannot reliably detect all text or graphics already printed in those corners, so inspect the preview before downloading.</div>
+</section>
+<section class="panel">
+  <div class="preview-head">
+    <h2 style="margin:0">Page preview</h2>
+    <span class="pill" id="pageBadge">No PDF loaded</span>
+  </div>
+  <div class="canvas-wrap" id="canvasWrap">
+    <div class="placeholder"><div class="symbol">🗎</div><b>Your PDF preview will appear here</b><p>Upload a PDF to view its first page.</p></div>
+    <canvas id="previewCanvas" hidden></canvas>
+  </div>
+  <p class="hint">The preview shows the selected page and the chosen corner images. The downloaded PDF retains the original page content and adds the images as overlays.</p>
+</section>
+</div>
+<footer>Local browser processing · No account required · Do not use this tool to alter documents deceptively.</footer>
+</div>
+
+<!-- The PDF libraries are loaded from public CDNs. An internet connection is needed to load them. -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script>
+(() => {
+const $ = id => document.getElementById(id);
+const pdfInput=$('pdfFile'), topInput=$('topImage'), bottomInput=$('bottomImage');
+const canvas=$('previewCanvas'), ctx=canvas.getContext('2d');
+let originalBytes=null, originalName='document.pdf', outputBytes=null, pdfJsDoc=null;
+let topBytes=null, bottomBytes=null, topType='', bottomType='', currentPage=1;
+if(window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+$('maxHeight').addEventListener('input',()=> $('heightLabel').textContent=$('maxHeight').value+' pt');
+['topShiftX','topShiftY','bottomShiftX','bottomShiftY'].forEach(id=>{
+  $(id).addEventListener('input',()=>{
+    $(id+'Label').textContent=$(id).value+' pt';
+    outputBytes=null;updateButtons();renderPreview();
+  });
+});
+
+function status(message,kind=''){
+  const el=$('status');el.textContent=message;el.className='status'+(kind?' '+kind:'');
+}
+function updateButtons(){
+  const ready=!!originalBytes && (!!topBytes || !!bottomBytes);
+  $('makePdf').disabled=!ready;
+  $('refreshPreview').disabled=!originalBytes;
+  $('downloadPdf').disabled=!outputBytes;
+}
+function readFile(file){return new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(new Uint8Array(r.result));r.onerror=()=>reject(new Error('Could not read file.'));r.readAsArrayBuffer(file);});}
+function imageType(file){
+  if(file.type==='image/png')return 'png';
+  if(file.type==='image/jpeg'||file.type==='image/jpg')return 'jpg';
+  if(file.type==='image/webp')return 'webp';
+  return '';
+}
+async function loadImage(input,which){
+  const file=input.files[0];
+  if(!file){if(which==='top'){topBytes=null;topType='';}else{bottomBytes=null;bottomType='';}return;}
+  const type=imageType(file);
+  if(!type){input.value='';throw new Error('Please select a PNG, JPEG or WebP image.');}
+  const bytes=await readFile(file);
+  let finalBytes=bytes, finalType=type;
+  if(type==='webp'){
+    // Convert WebP to PNG using the browser so PDF embedding is broadly compatible.
+    const url=URL.createObjectURL(file);
+    try{
+      const img=new Image();img.src=url;await img.decode();
+      const c=document.createElement('canvas');c.width=img.naturalWidth;c.height=img.naturalHeight;
+      c.getContext('2d').drawImage(img,0,0);
+      const blob=await new Promise(res=>c.toBlob(res,'image/png'));
+      finalBytes=new Uint8Array(await blob.arrayBuffer());finalType='png';
+    }finally{URL.revokeObjectURL(url);}
+  }
+  if(which==='top'){topBytes=finalBytes;topType=finalType;}else{bottomBytes=finalBytes;bottomType=finalType;}
+}
+async function renderPreview(){
+  if(!originalBytes)return;
+  if(!window.pdfjsLib){status('PDF preview library did not load. Check your internet connection and reload the page.','error');return;}
+  try{
+    const doc=await pdfjsLib.getDocument({data:originalBytes.slice()}).promise;
+    pdfJsDoc=doc;
+    const pageNum=Math.min(currentPage,doc.numPages);
+    const page=await doc.getPage(pageNum);
+    const viewport=page.getViewport({scale:1.15});
+    canvas.width=viewport.width;canvas.height=viewport.height;canvas.hidden=false;
+    await page.render({canvasContext:ctx,viewport}).promise;
+    // Preview overlays are approximate screen-space placements corresponding to PDF point values.
+    const margin=Math.max(0,Number($('margin').value)||0)*1.15;
+    const mw=Math.max(12,Number($('maxWidth').value)||90)*1.15;
+    const mh=Number($('maxHeight').value)*1.15;
+    const topDX=Number($('topShiftX').value||0)*1.15, topDY=Number($('topShiftY').value||0)*1.15;
+    const bottomDX=Number($('bottomShiftX').value||0)*1.15, bottomDY=Number($('bottomShiftY').value||0)*1.15;
+    async function drawPreviewImage(bytes,type,x,y,corner){
+      if(!bytes)return;
+      const blob=new Blob([bytes],{type:type==='jpg'?'image/jpeg':'image/png'});
+      const url=URL.createObjectURL(blob);
+      try{
+        const im=new Image();im.src=url;await im.decode();
+        const scale=Math.min(mw/im.naturalWidth,mh/im.naturalHeight,1);
+        const w=im.naturalWidth*scale,h=im.naturalHeight*scale;
+        ctx.drawImage(im,x,y,w,h);
+      }finally{URL.revokeObjectURL(url);}
+    }
+    const pw=canvas.width,ph=canvas.height;
+    if(topBytes){
+      const blob=new Blob([topBytes],{type:topType==='jpg'?'image/jpeg':'image/png'});
+      const url=URL.createObjectURL(blob);
+      try{
+        const im=new Image();im.src=url;await im.decode();
+        const scale=Math.min(mw/im.naturalWidth,mh/im.naturalHeight,1);
+        const w=im.naturalWidth*scale,h=im.naturalHeight*scale;
+        const x=Math.max(0,Math.min(pw-w,margin+topDX));
+        const y=Math.max(0,Math.min(ph-h,margin+topDY));
+        ctx.drawImage(im,x,y,w,h);
+      }finally{URL.revokeObjectURL(url);}
+    }
+    if(bottomBytes){
+      const blob=new Blob([bottomBytes],{type:bottomType==='jpg'?'image/jpeg':'image/png'});
+      const url=URL.createObjectURL(blob);
+      try{
+        const im=new Image();im.src=url;await im.decode();
+        const scale=Math.min(mw/im.naturalWidth,mh/im.naturalHeight,1);
+        const w=im.naturalWidth*scale,h=im.naturalHeight*scale;
+        const x=Math.max(0,Math.min(pw-w,pw-margin-w+bottomDX));
+        const y=Math.max(0,Math.min(ph-h,ph-margin-h+bottomDY));
+        ctx.drawImage(im,x,y,w,h);
+      }finally{URL.revokeObjectURL(url);}
+    }
+    $('pageBadge').textContent=`Page ${pageNum} of ${doc.numPages}`;
+    $('canvasWrap').querySelector('.placeholder')?.remove();
+    status('Preview ready. Check that the corner images do not cover important content.','success');
+  }catch(e){status('Could not render preview: '+e.message,'error');}
+}
+pdfInput.addEventListener('change',async()=>{
+  outputBytes=null;originalBytes=null;pdfJsDoc=null;currentPage=1;updateButtons();
+  const f=pdfInput.files[0];if(!f)return;
+  if(f.type!=='application/pdf'&&!f.name.toLowerCase().endsWith('.pdf')){status('Please choose a PDF file.','error');return;}
+  try{
+    status('Reading PDF…');originalBytes=await readFile(f);originalName=f.name;
+    if(!window.PDFLib)throw new Error('PDF processing library did not load. Check your internet connection and reload.');
+    const loaded=await PDFLib.PDFDocument.load(originalBytes.slice(),{ignoreEncryption:false});
+    $('pageBadge').textContent=`${loaded.getPageCount()} page${loaded.getPageCount()===1?'':'s'}`;
+    updateButtons();await renderPreview();
+  }catch(e){originalBytes=null;updateButtons();status('Could not open this PDF. It may be encrypted, damaged, or unsupported. Details: '+e.message,'error');}
+});
+topInput.addEventListener('change',async()=>{try{await loadImage(topInput,'top');outputBytes=null;updateButtons();await renderPreview();}catch(e){status(e.message,'error');}});
+bottomInput.addEventListener('change',async()=>{try{await loadImage(bottomInput,'bottom');outputBytes=null;updateButtons();await renderPreview();}catch(e){status(e.message,'error');}});
+$('margin').addEventListener('change',()=>{outputBytes=null;updateButtons();renderPreview();});
+$('maxWidth').addEventListener('change',()=>{outputBytes=null;updateButtons();renderPreview();});
+$('maxHeight').addEventListener('change',()=>{outputBytes=null;updateButtons();renderPreview();});
+$('pages').addEventListener('change',()=>{outputBytes=null;updateButtons();renderPreview();});
+$('refreshPreview').addEventListener('click',renderPreview);
+$('makePdf').addEventListener('click',async()=>{
+  if(!originalBytes||(!topBytes&&!bottomBytes))return;
+  const btn=$('makePdf');btn.disabled=true;status('Generating PDF… please wait.');
+  try{
+    const {PDFDocument}=PDFLib;
+    const doc=await PDFDocument.load(originalBytes.slice());
+    let topImage=null,bottomImage=null;
+    if(topBytes)topImage=topType==='jpg'?await doc.embedJpg(topBytes):await doc.embedPng(topBytes);
+    if(bottomBytes)bottomImage=bottomType==='jpg'?await doc.embedJpg(bottomBytes):await doc.embedPng(bottomBytes);
+    const pages=doc.getPages(),mode=$('pages').value;
+    const margin=Math.max(0,Math.min(144,Number($('margin').value)||0));
+    const maxW=Math.max(12,Math.min(360,Number($('maxWidth').value)||90));
+    const maxH=Math.max(20,Math.min(180,Number($('maxHeight').value)||60));
+    const selected=pages.map((p,i)=>({p,i})).filter(({i})=>mode==='all'||(mode==='first'&&i===0)||(mode==='last'&&i===pages.length-1));
+    for(const {p} of selected){
+      const {width,height}=p.getSize();
+      function dims(img){
+        if(!img)return null;
+        const s=Math.min(maxW/img.width,maxH/img.height,1);
+        return {width:img.width*s,height:img.height*s};
+      }
+      const td=dims(topImage),bd=dims(bottomImage);
+      const topDX=Number($('topShiftX').value||0), topDY=Number($('topShiftY').value||0);
+      const bottomDX=Number($('bottomShiftX').value||0), bottomDY=Number($('bottomShiftY').value||0);
+      if(td){
+        const x=Math.max(0,Math.min(width-td.width,margin+topDX));
+        const y=Math.max(0,Math.min(height-td.height,height-margin-td.height-topDY));
+        p.drawImage(topImage,{x,y,width:td.width,height:td.height});
+      }
+      if(bd){
+        const x=Math.max(0,Math.min(width-bd.width,width-margin-bd.width+bottomDX));
+        const y=Math.max(0,Math.min(height-bd.height,margin-bottomDY));
+        p.drawImage(bottomImage,{x,y,width:bd.width,height:bd.height});
+      }
+    }
+    outputBytes=await doc.save();
+    updateButtons();status(`PDF generated successfully (${pages.length} page${pages.length===1?'':'s'} in source). Use Download PDF to save the new file.`,'success');
+    await renderPreview();
+  }catch(e){outputBytes=null;updateButtons();status('PDF generation failed: '+e.message,'error');}
+  finally{btn.disabled=!originalBytes||(!topBytes&&!bottomBytes);}
+});
+$('downloadPdf').addEventListener('click',()=>{
+  if(!outputBytes)return;
+  const blob=new Blob([outputBytes],{type:'application/pdf'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  const stem=originalName.replace(/\.pdf$/i,'')||'document';
+  a.href=url;a.download=stem+'_with_corner_images.pdf';document.body.appendChild(a);a.click();a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),1500);
+});
+})();
+</script>
+</body>
+</html>
